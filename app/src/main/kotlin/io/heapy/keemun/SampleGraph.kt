@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 object SampleGraph {
     fun create(): KeemunGraph =

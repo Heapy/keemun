@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import java.io.PrintStream
 import java.nio.file.Files

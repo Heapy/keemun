@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 class HtmlRenderer(
     private val cosmographRenderer: CosmographHtmlRenderer = CosmographHtmlRenderer(),

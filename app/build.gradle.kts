@@ -37,7 +37,7 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "org.keemun.MainKt"
+    mainClass = "io.heapy.keemun.MainKt"
     applicationName = "keemun"
 }
 

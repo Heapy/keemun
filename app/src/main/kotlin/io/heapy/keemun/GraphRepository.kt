@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files

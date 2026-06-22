@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 class CosmographHtmlRenderer {
     fun render(graph: KeemunGraph, editable: Boolean = false): String {

@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode

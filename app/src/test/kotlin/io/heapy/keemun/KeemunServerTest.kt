@@ -1,4 +1,4 @@
-package org.keemun
+package io.heapy.keemun
 
 import io.ktor.client.request.get
 import io.ktor.client.request.header
