@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "summary": "A decision graph for architectural documentation."
+  },
+  "nodes": [
+    {
+      "id": "compile-time-framework",
+      "type": "decision",
+      "title": "Build a compile-time framework",
+      "summary": "Generate framework wiring before runtime so failures surface earlier and startup stays predictable.",
+      "tags": [
+        "architecture",
+        "performance"
+      ]
+    },
+    {
+      "id": "framework-code",
+      "type": "decision",
+      "title": "Use a framework boundary",
+      "summary": "Keep application code scalable and testable by centralizing conventions in a framework layer.",
+      "tags": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "kotlin-language",
+      "type": "constraint",
+      "title": "Kotlin is the implementation language",
+      "summary": "The project is written in Kotlin, so integration points should fit Kotlin tooling and idioms.",
+      "tags": [
+        "external"
+      ],
+      "external": true
+    },
+    {
+      "id": "ksp",
+      "type": "decision",
+      "title": "Use KSP for compile-time integration",
+      "summary": "KSP provides a Kotlin-native symbol processing API for code generation.",
+      "tags": [
+        "tooling"
+      ]
+    },
+    {
+      "id": "runtime-reflection",
+      "type": "option",
+      "title": "Runtime reflection",
+      "summary": "A rejected implementation option that discovers wiring while the application starts.",
+      "status": "rejected",
+      "tags": [
+        "alternative"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "kotlin-enables-framework",
+      "source": "kotlin-language",
+      "target": "framework-code",
+      "type": "enables",
+      "rationale": "Kotlin gives enough type-system support and compiler tooling to express framework contracts without hiding application behavior.",
+      "weight": 0.74,
+      "order": 1,
+      "criteria": [
+        "language-fit",
+        "testability"
+      ]
+    },
+    {
+      "id": "framework-enables-compile-time",
+      "source": "framework-code",
+      "target": "compile-time-framework",
+      "type": "enables",
+      "rationale": "A framework boundary creates a small set of conventions that can be checked and generated ahead of runtime.",
+      "weight": 0.82,
+      "order": 2,
+      "criteria": [
+        "startup",
+        "testability"
+      ]
+    },
+    {
+      "id": "kotlin-constrains-ksp",
+      "source": "kotlin-language",
+      "target": "ksp",
+      "type": "constrains",
+      "rationale": "Because Kotlin is fixed externally, the generation mechanism should understand Kotlin symbols without falling back to Java-only annotation processing.",
+      "weight": 0.9,
+      "order": 3,
+      "criteria": [
+        "language-fit"
+      ]
+    },
+    {
+      "id": "compile-time-enables-ksp",
+      "source": "compile-time-framework",
+      "target": "ksp",
+      "type": "enables",
+      "rationale": "Once framework wiring is moved to compile time, a symbol processor is needed to inspect Kotlin declarations and generate code.",
+      "weight": 0.86,
+      "order": 4,
+      "criteria": [
+        "maintainability",
+        "tooling-fit"
+      ]
+    },
+    {
+      "id": "runtime-conflicts-compile-time",
+      "source": "runtime-reflection",
+      "target": "compile-time-framework",
+      "type": "conflicts",
+      "rationale": "Runtime discovery was considered, but it moves wiring mistakes to execution time and can slow cold start, so it conflicts with the chosen compile-time direction.",
+      "status": "rejected",
+      "polarity": "negative",
+      "weight": 0.93,
+      "order": 5,
+      "criteria": [
+        "correctness",
+        "startup"
+      ]
+    }
+  ]
+}
