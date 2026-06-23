@@ -1,46 +1,93 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
-    application
 }
 
 repositories {
     mavenCentral()
 }
 
-dependencies {
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.ktor.server.core)
-    implementation(libs.ktor.server.cio)
-    runtimeOnly(libs.logback.classic)
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 
-    testImplementation(kotlin("test"))
-    testImplementation(libs.ktor.server.test.host)
-}
+    jvm {
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+        }
+    }
 
-testing {
-    suites {
-        // Configure the built-in test suite
-        val test = named<JvmTestSuite>("test") {
-            // Use JUnit Jupiter test framework
-            useJUnitJupiter("6.0.1")
+    listOf(
+        linuxX64(),
+        linuxArm64(),
+        macosArm64(),
+    ).forEach { target ->
+        target.binaries {
+            executable {
+                baseName = "keemun"
+                entryPoint = "io.heapy.keemun.main"
+            }
+        }
+    }
+
+    jvmToolchain(25)
+
+    sourceSets {
+        commonMain {
+            kotlin.srcDir("src/main/kotlin")
+            dependencies {
+                implementation(libs.clikt)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+                implementation(libs.okio)
+            }
+        }
+
+        jvmMain {
+            dependencies {
+                runtimeOnly(libs.logback.classic)
+            }
+        }
+
+        jvmTest {
+            kotlin.srcDir("src/test/kotlin")
+            dependencies {
+                implementation(kotlin("test-junit5"))
+                implementation(libs.junit.jupiter.api)
+                runtimeOnly(libs.junit.jupiter.engine)
+                implementation(libs.ktor.server.test.host)
+            }
         }
     }
 }
 
-// Apply a specific Java toolchain to ease working on different environments.
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-
-application {
-    // Define the main class for the application.
+tasks.register<JavaExec>("run") {
+    group = "application"
+    description = "Runs this project as a JVM application"
+    dependsOn("jvmMainClasses")
     mainClass = "io.heapy.keemun.MainKt"
-    applicationName = "keemun"
+    classpath = files(
+        kotlin.targets["jvm"].compilations["main"].output.allOutputs,
+        kotlin.targets["jvm"].compilations["main"].runtimeDependencyFiles,
+    )
+    workingDir = rootProject.projectDir
 }
 
-tasks.named<JavaExec>("run") {
-    workingDir = rootProject.projectDir
+val nativeReleaseSource = layout.buildDirectory.file("bin/macosArm64/releaseExecutable/keemun.kexe")
+val nativeReleaseDestinationDir = layout.buildDirectory.dir("native")
+
+tasks.register<Copy>("nativeReleaseBinary") {
+    group = "build"
+    description = "Builds a macOS ARM64 Kotlin/Native release executable at build/native/keemun"
+    dependsOn("linkReleaseExecutableMacosArm64")
+    from(nativeReleaseSource) {
+        rename { "keemun" }
+    }
+    into(nativeReleaseDestinationDir)
+}
+
+tasks.named("assemble") {
+    dependsOn("nativeReleaseBinary")
 }

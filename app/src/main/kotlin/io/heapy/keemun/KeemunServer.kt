@@ -14,9 +14,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import io.ktor.utils.io.charsets.Charsets
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import java.nio.charset.StandardCharsets
 
 class KeemunServer(
     private val repository: GraphRepository,
@@ -47,7 +47,7 @@ fun Application.keemunApplication(
         get("/api/graph") {
             call.respondText(
                 repository.readJson(),
-                ContentType.Application.Json.withCharset(StandardCharsets.UTF_8),
+                ContentType.Application.Json.withCharset(Charsets.UTF_8),
             )
         }
         put("/api/graph") {
@@ -63,7 +63,7 @@ fun Application.keemunApplication(
                 TraceService.describe(repository.read(), id, from)
             }.fold(
                 onSuccess = { description ->
-                    call.respondText(description, ContentType.Text.Plain.withCharset(StandardCharsets.UTF_8))
+                    call.respondText(description, ContentType.Text.Plain.withCharset(Charsets.UTF_8))
                 },
                 onFailure = { error ->
                     call.respondError(HttpStatusCode.BadRequest, error.message ?: "Could not describe node")
@@ -81,7 +81,6 @@ private class RenderCache(
     private var editableHtml: RenderSnapshot? = null
     private var staticHtml: RenderSnapshot? = null
 
-    @Synchronized
     fun html(editable: Boolean): String {
         val graphSnapshot = repository.snapshot()
         val current = if (editable) editableHtml else staticHtml
@@ -99,7 +98,6 @@ private class RenderCache(
         return html
     }
 
-    @Synchronized
     fun invalidate() {
         editableHtml = null
         staticHtml = null
@@ -113,7 +111,7 @@ private data class RenderSnapshot(
 )
 
 private suspend fun ApplicationCall.respondHtml(html: String) {
-    respondText(html, ContentType.Text.Html.withCharset(StandardCharsets.UTF_8))
+    respondText(html, ContentType.Text.Html.withCharset(Charsets.UTF_8))
 }
 
 private suspend fun ApplicationCall.saveGraph(repository: GraphRepository, renderCache: RenderCache) {
@@ -122,7 +120,7 @@ private suspend fun ApplicationCall.saveGraph(repository: GraphRepository, rende
     }.fold(
         onSuccess = { graph ->
             renderCache.invalidate()
-            respondText(repository.toJson(graph), ContentType.Application.Json.withCharset(StandardCharsets.UTF_8))
+            respondText(repository.toJson(graph), ContentType.Application.Json.withCharset(Charsets.UTF_8))
         },
         onFailure = { error ->
             val details = if (error is GraphValidationException) error.errors else emptyList()
@@ -139,7 +137,7 @@ private suspend fun ApplicationCall.respondError(
     val payload = ErrorPayload(error = message, details = details)
     respondText(
         GraphJson.format.encodeToString(payload),
-        ContentType.Application.Json.withCharset(StandardCharsets.UTF_8),
+        ContentType.Application.Json.withCharset(Charsets.UTF_8),
         status,
     )
 }

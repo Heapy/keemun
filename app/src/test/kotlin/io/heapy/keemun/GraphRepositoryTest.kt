@@ -40,14 +40,14 @@ class GraphRepositoryTest {
         )
 
         val path = tempDir.resolve("keemun.json")
-        val written = GraphRepository(path).write(graph)
+        val written = GraphRepository(path.toString()).write(graph)
         val text = Files.readString(path)
 
         assertEquals(listOf("a-node", "z-node"), written.nodes.map { it.id })
         assertEquals(listOf("a-edge", "z-edge"), written.edges.map { it.id })
         assertTrue(text.indexOf("\"id\": \"a-node\"") < text.indexOf("\"id\": \"z-node\""))
         assertTrue(text.endsWith("\n"))
-        assertEquals(text, GraphRepository(path).readJson())
+        assertEquals(text, GraphRepository(path.toString()).readJson())
     }
 
     @Test
@@ -66,7 +66,7 @@ class GraphRepositoryTest {
         )
 
         val error = assertThrows(GraphValidationException::class.java) {
-            GraphRepository(tempDir.resolve("keemun.json")).write(graph)
+            GraphRepository(tempDir.resolve("keemun.json").toString()).write(graph)
         }
 
         assertTrue(error.errors.any { it.contains("missing target") })

@@ -1,15 +1,23 @@
 [versions]
+clikt = "5.1.0"
 ktor = "3.5.0"
 kotlinx-serialization-json = "1.11.0"
 logback = "1.5.34"
+okio = "3.17.0"
+junit-jupiter = "6.1.0"
 
 [libraries]
-ktor-server-cio = { module = "io.ktor:ktor-server-cio-jvm", version.ref = "ktor" }
-ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
-ktor-server-test-host = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm", version.ref = "kotlinx-serialization-json" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version = "2.4.0" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version = "2.4.0" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version = "2.4.0" }

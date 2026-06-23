@@ -1,11 +1,10 @@
 package io.heapy.keemun
 
+import com.github.ajalt.clikt.testing.test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -65,17 +64,15 @@ class CliTest {
         )
 
         assertEquals(0, generated.code, generated.err)
-        val graph = GraphRepository(graphPath).read()
+        val graph = GraphRepository(graphPath.toString()).read()
         assertEquals(1000, graph.nodes.size)
         assertEquals(3000, graph.edges.size)
         assertEquals("edge-000001", graph.edges.first().id)
     }
 
     private fun runCli(cli: KeemunCli, vararg args: String): CliResult {
-        val out = ByteArrayOutputStream()
-        val err = ByteArrayOutputStream()
-        val code = cli.run(args.toList().toTypedArray(), PrintStream(out), PrintStream(err))
-        return CliResult(code, out.toString(), err.toString())
+        val result = cli.command().test(args.toList())
+        return CliResult(result.statusCode, result.stdout, result.stderr)
     }
 
     private data class CliResult(

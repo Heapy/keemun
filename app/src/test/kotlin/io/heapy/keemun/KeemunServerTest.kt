@@ -21,7 +21,7 @@ class KeemunServerTest {
 
     @Test
     fun `serves html and saves edited graph`() = testApplication {
-        val repository = GraphRepository(tempDir.resolve("keemun.json"))
+        val repository = GraphRepository(tempDir.resolve("keemun.json").toString())
         repository.write(SampleGraph.create())
 
         application {

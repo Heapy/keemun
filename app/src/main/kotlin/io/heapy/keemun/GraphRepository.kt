@@ -1,62 +1,35 @@
 package io.heapy.keemun
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption.CREATE
-import java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
-import java.nio.file.StandardOpenOption.WRITE
-import java.nio.file.attribute.BasicFileAttributes
-import java.util.concurrent.TimeUnit
+class GraphRepository(private val path: KeemunPath) {
+    constructor(path: String) : this(KeemunPath(path))
 
-class GraphRepository(private val path: Path) {
-    private var cachedSnapshot: GraphSnapshot? = null
-
-    fun exists(): Boolean = Files.exists(path)
+    fun exists(): Boolean = KeemunFiles.exists(path)
 
     fun read(): KeemunGraph = snapshot().graph
 
     fun readJson(): String = snapshot().json
 
-    @Synchronized
     internal fun snapshot(): GraphSnapshot {
         if (!exists()) {
             throw IllegalArgumentException("Graph file does not exist: $path")
         }
         val cacheKey = cacheKey()
-        cachedSnapshot?.let { snapshot ->
-            if (snapshot.cacheKey == cacheKey) {
-                return snapshot
-            }
-        }
-
-        val graph = parse(Files.readString(path, StandardCharsets.UTF_8))
+        val graph = parse(KeemunFiles.readString(path))
         val json = encode(graph)
-        return GraphSnapshot(graph, json, cacheKey).also {
-            cachedSnapshot = it
-        }
+        return GraphSnapshot(graph, json, cacheKey)
     }
 
     fun parse(text: String): KeemunGraph =
         GraphJson.decode(text).requireValid()
 
-    @Synchronized
     fun write(graph: KeemunGraph): KeemunGraph {
         val normalized = graph.requireValid()
         val parent = path.parent
         if (parent != null) {
-            Files.createDirectories(parent)
+            KeemunFiles.createDirectories(parent)
         }
         val json = encode(normalized)
-        Files.writeString(
-            path,
-            json,
-            StandardCharsets.UTF_8,
-            CREATE,
-            WRITE,
-            TRUNCATE_EXISTING,
-        )
-        cachedSnapshot = GraphSnapshot(normalized, json, cacheKey())
+        KeemunFiles.writeString(path, json)
         return normalized
     }
 
@@ -69,13 +42,8 @@ class GraphRepository(private val path: Path) {
     private fun encode(graph: KeemunGraph): String =
         GraphJson.encode(graph) + "\n"
 
-    private fun cacheKey(): GraphCacheKey {
-        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
-        return GraphCacheKey(
-            lastModifiedNanos = attributes.lastModifiedTime().to(TimeUnit.NANOSECONDS),
-            size = attributes.size(),
-        )
-    }
+    private fun cacheKey(): GraphCacheKey =
+        KeemunFiles.metadata(path)
 }
 
 internal data class GraphSnapshot(

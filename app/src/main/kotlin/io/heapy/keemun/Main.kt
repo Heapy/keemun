@@ -1,201 +1,176 @@
 package io.heapy.keemun
 
-import java.io.PrintStream
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.nameWithoutExtension
-import kotlin.system.exitProcess
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.NoOpCliktCommand
+import com.github.ajalt.clikt.core.ParameterHolder
+import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.check
+import com.github.ajalt.clikt.parameters.options.convert
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.int
 
 fun main(args: Array<String>) {
-    exitProcess(KeemunCli().run(args, System.out, System.err))
+    KeemunCli().command().main(args)
 }
 
 class KeemunCli(
     private val renderer: HtmlRenderer = HtmlRenderer(),
 ) {
-    fun run(args: Array<String>, out: PrintStream, err: PrintStream): Int {
-        if (args.isEmpty() || args[0] == "--help" || args[0] == "-h") {
-            out.println(usage())
-            return 0
-        }
+    fun command(): CliktCommand =
+        KeemunCommand(renderer)
+}
 
-        return runCatching {
-            val command = args[0]
-            val parsed = ParsedArgs(args.drop(1))
-            when (command) {
-                "init" -> init(parsed, out)
-                "generate" -> generate(parsed, out)
-                "render" -> render(parsed, out)
-                "serve" -> serve(parsed, out)
-                "describe" -> describe(parsed, out)
-                "validate" -> validate(parsed, out)
-                else -> {
-                    err.println("Unknown command: $command")
-                    err.println(usage())
-                    2
-                }
-            }
-        }.getOrElse { error ->
-            err.println(error.message ?: error.toString())
-            1
-        }
+private class KeemunCommand(renderer: HtmlRenderer) : NoOpCliktCommand(name = "keemun") {
+    init {
+        subcommands(
+            InitCommand(),
+            GenerateCommand(),
+            RenderCommand(renderer),
+            ServeCommand(renderer),
+            DescribeCommand(),
+            ValidateCommand(),
+        )
     }
 
-    private fun init(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", defaultGraphPath)
-        val force = args.flag("--force")
-        if (Files.exists(file) && !force) {
-            throw IllegalArgumentException("$file already exists; pass --force to overwrite it")
-        }
-        GraphRepository(file).write(SampleGraph.create())
-        out.println("Wrote $file")
-        return 0
-    }
-
-    private fun generate(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", Path.of("keemun-synthetic.json"))
-        val nodeCount = args.positiveInt("--nodes", 1_000)
-        val edgeCount = args.nonNegativeInt("--edges", (nodeCount * 12) / 10)
-        val clusterCount = args.positiveInt("--clusters", (nodeCount / 64).coerceIn(4, 24))
-        val seed = args.intOption("--seed", 42)
-        val force = args.flag("--force")
-        if (Files.exists(file) && !force) {
-            throw IllegalArgumentException("$file already exists; pass --force to overwrite it")
-        }
-
-        val graph = GraphRepository(file).write(SyntheticGraph.create(nodeCount, edgeCount, seed, clusterCount))
-        out.println("Wrote $file with ${graph.nodes.size} nodes, ${graph.edges.size} edges, and $clusterCount clusters using seed $seed")
-        return 0
-    }
-
-    private fun render(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", defaultGraphPath)
-        val repository = GraphRepository(file)
-        val output = args.pathOption("--out", defaultHtmlPath(file))
-        val engine = RenderEngine.parse(args.option("--engine"))
-        val graph = repository.read()
-        val parent = output.parent
-        if (parent != null) {
-            Files.createDirectories(parent)
-        }
-        Files.writeString(output, renderer.render(graph, editable = false, engine = engine))
-        out.println("Wrote $output using ${engine.wireName}")
-        return 0
-    }
-
-    private fun serve(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", defaultGraphPath)
-        val host = args.option("--host") ?: "127.0.0.1"
-        val portText = args.option("--port")
-        val port = portText?.toIntOrNull()
-            ?: if (portText == null) 8080 else throw IllegalArgumentException("--port must be an integer")
-        val engine = RenderEngine.parse(args.option("--engine"))
-        GraphRepository(file).read()
-        out.println("Serving $file at http://$host:$port using ${engine.wireName}")
-        KeemunServer(GraphRepository(file), renderer, engine).start(host, port)
-        return 0
-    }
-
-    private fun describe(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", defaultGraphPath)
-        val nodeId = args.positionals.firstOrNull()
-            ?: throw IllegalArgumentException("describe requires a node id")
-        val from = args.option("--from")
-        out.println(TraceService.describe(GraphRepository(file).read(), nodeId, from))
-        return 0
-    }
-
-    private fun validate(args: ParsedArgs, out: PrintStream): Int {
-        val file = args.pathOption("--file", defaultGraphPath)
-        val graph = GraphRepository(file).read()
-        out.println("Valid graph: ${graph.nodes.size} nodes, ${graph.edges.size} edges")
-        return 0
-    }
-
-    private fun usage(): String =
+    override fun help(context: Context): String =
         """
         Keemun decision graph CLI
-
-        Commands:
-          init [--file keemun.json] [--force]
-          generate [--file keemun-synthetic.json] [--nodes 1000] [--edges 1200] [--clusters 15] [--seed 42] [--force]
-          render [--file keemun.json] [--out keemun.html] [--engine svg|cosmograph]
-          serve [--file keemun.json] [--host 127.0.0.1] [--port 8080] [--engine svg|cosmograph]
-          describe <node-id> [--file keemun.json] [--from <node-id>]
-          validate [--file keemun.json]
 
         The JSON format is a property graph: nodes are decisions, constraints,
         questions, options, or outcomes; edges are first-class rationale records
         with Kruchten-style relationship types and QOC-style weights.
         """.trimIndent()
+}
 
-    private class ParsedArgs(args: List<String>) {
-        val positionals: List<String>
-        private val options: Map<String, String?>
+private class InitCommand : CliktCommand(name = "init") {
+    private val file by pathOption("--file", defaultGraphPath)
+    private val force by option("--force").flag()
 
-        init {
-            val parsedOptions = linkedMapOf<String, String?>()
-            val parsedPositionals = mutableListOf<String>()
-            var index = 0
-            while (index < args.size) {
-                val token = args[index]
-                if (token.startsWith("--")) {
-                    val value = args.getOrNull(index + 1)
-                    if (value != null && !value.startsWith("--")) {
-                        parsedOptions[token] = value
-                        index += 2
-                    } else {
-                        parsedOptions[token] = null
-                        index += 1
-                    }
-                } else {
-                    parsedPositionals += token
-                    index += 1
-                }
-            }
-            options = parsedOptions
-            positionals = parsedPositionals
+    override fun help(context: Context): String = "Create a sample decision graph."
+
+    override fun run() = runCommand {
+        if (KeemunFiles.exists(file) && !force) {
+            throw IllegalArgumentException("$file already exists; pass --force to overwrite it")
+        }
+        GraphRepository(file).write(SampleGraph.create())
+        echo("Wrote $file")
+    }
+}
+
+private class GenerateCommand : CliktCommand(name = "generate") {
+    private val file by pathOption("--file", KeemunPath("keemun-synthetic.json"))
+    private val nodeCount by option("--nodes").int().default(1_000).check("--nodes must be positive") { it > 0 }
+    private val edgeCount by option("--edges").int().default(-1).check("--edges must not be negative") { it >= -1 }
+    private val clusterCount by option("--clusters").int().default(-1).check("--clusters must be positive") { it == -1 || it > 0 }
+    private val seed by option("--seed").int().default(42)
+    private val force by option("--force").flag()
+
+    override fun help(context: Context): String = "Create a deterministic synthetic graph."
+
+    override fun run() = runCommand {
+        val resolvedEdgeCount = if (edgeCount == -1) (nodeCount * 12) / 10 else edgeCount
+        val resolvedClusterCount = if (clusterCount == -1) {
+            (nodeCount / 64).coerceIn(4, 24)
+        } else {
+            clusterCount
         }
 
-        fun option(name: String): String? = options[name]
-
-        fun flag(name: String): Boolean = options.containsKey(name)
-
-        fun pathOption(name: String, default: Path): Path =
-            option(name)?.let(Path::of) ?: default
-
-        fun intOption(name: String, default: Int): Int =
-            option(name)?.toIntOrNull() ?: if (option(name) == null) {
-                default
-            } else {
-                throw IllegalArgumentException("$name must be an integer")
-            }
-
-        fun positiveInt(name: String, default: Int): Int =
-            intOption(name, default).also {
-                if (it <= 0) {
-                    throw IllegalArgumentException("$name must be positive")
-                }
-            }
-
-        fun nonNegativeInt(name: String, default: Int): Int =
-            intOption(name, default).also {
-                if (it < 0) {
-                    throw IllegalArgumentException("$name must not be negative")
-                }
-            }
-    }
-
-    companion object {
-        private val defaultGraphPath: Path = Path.of("keemun.json")
-
-        private fun defaultHtmlPath(input: Path): Path {
-            val name = if (input.fileName.toString().endsWith(".json")) {
-                input.fileName.nameWithoutExtension + ".html"
-            } else {
-                "keemun.html"
-            }
-            return input.parent?.resolve(name) ?: Path.of(name)
+        if (KeemunFiles.exists(file) && !force) {
+            throw IllegalArgumentException("$file already exists; pass --force to overwrite it")
         }
+
+        val graph = GraphRepository(file).write(
+            SyntheticGraph.create(nodeCount, resolvedEdgeCount, seed, resolvedClusterCount),
+        )
+        echo("Wrote $file with ${graph.nodes.size} nodes, ${graph.edges.size} edges, and $resolvedClusterCount clusters using seed $seed")
     }
+}
+
+private class RenderCommand(private val renderer: HtmlRenderer) : CliktCommand(name = "render") {
+    private val file by pathOption("--file", defaultGraphPath)
+    private val output by option("--out").convert { KeemunPath(it) }
+    private val engineName by option("--engine").default(RenderEngine.SVG.wireName)
+
+    override fun help(context: Context): String = "Render a graph to a standalone HTML file."
+
+    override fun run() = runCommand {
+        val repository = GraphRepository(file)
+        val target = output ?: defaultHtmlPath(file)
+        val engine = RenderEngine.parse(engineName)
+        val graph = repository.read()
+        target.parent?.let(KeemunFiles::createDirectories)
+        KeemunFiles.writeString(target, renderer.render(graph, editable = false, engine = engine))
+        echo("Wrote $target using ${engine.wireName}")
+    }
+}
+
+private class ServeCommand(private val renderer: HtmlRenderer) : CliktCommand(name = "serve") {
+    private val file by pathOption("--file", defaultGraphPath)
+    private val host by option("--host").default("127.0.0.1")
+    private val port by option("--port").int().default(8080)
+    private val engineName by option("--engine").default(RenderEngine.SVG.wireName)
+
+    override fun help(context: Context): String = "Serve an editable graph over HTTP."
+
+    override fun run() = runCommand {
+        val engine = RenderEngine.parse(engineName)
+        GraphRepository(file).read()
+        echo("Serving $file at http://$host:$port using ${engine.wireName}")
+        KeemunServer(GraphRepository(file), renderer, engine).start(host, port)
+    }
+}
+
+private class DescribeCommand : CliktCommand(name = "describe") {
+    private val nodeId by argument("node-id")
+    private val file by pathOption("--file", defaultGraphPath)
+    private val from by option("--from")
+
+    override fun help(context: Context): String = "Describe a node and its rationale trace."
+
+    override fun run() = runCommand {
+        echo(TraceService.describe(GraphRepository(file).read(), nodeId, from))
+    }
+}
+
+private class ValidateCommand : CliktCommand(name = "validate") {
+    private val file by pathOption("--file", defaultGraphPath)
+
+    override fun help(context: Context): String = "Validate a graph JSON file."
+
+    override fun run() = runCommand {
+        val graph = GraphRepository(file).read()
+        echo("Valid graph: ${graph.nodes.size} nodes, ${graph.edges.size} edges")
+    }
+}
+
+private fun CliktCommand.runCommand(block: () -> Unit) {
+    try {
+        block()
+    } catch (error: ProgramResult) {
+        throw error
+    } catch (error: Exception) {
+        echo(error.message ?: error.toString(), err = true)
+        throw ProgramResult(1)
+    }
+}
+
+private fun ParameterHolder.pathOption(name: String, default: KeemunPath) =
+    option(name).convert { KeemunPath(it) }.default(default)
+
+private val defaultGraphPath: KeemunPath = KeemunPath("keemun.json")
+
+private fun defaultHtmlPath(input: KeemunPath): KeemunPath {
+    val fileName = input.fileName
+    val name = if (fileName.endsWith(".json")) {
+        fileName.substringBeforeLast(".json") + ".html"
+    } else {
+        "keemun.html"
+    }
+    return input.parent?.resolve(name) ?: KeemunPath(name)
 }

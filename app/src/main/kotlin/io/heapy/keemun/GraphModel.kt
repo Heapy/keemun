@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Serializable
 data class KeemunGraph(
@@ -130,7 +131,14 @@ data class GraphEdge(
     val criteria: List<String> = emptyList(),
 ) {
     fun strengthLabel(): String =
-        if (abs(weight - 1.0) < 0.0001) "1.0" else "%.2f".format(weight)
+        if (abs(weight - 1.0) < 0.0001) "1.0" else twoDecimalPlaces(weight)
+}
+
+private fun twoDecimalPlaces(value: Double): String {
+    val scaled = (value * 100.0).roundToInt()
+    val whole = scaled / 100
+    val fraction = abs(scaled % 100).toString().padStart(2, '0')
+    return "$whole.$fraction"
 }
 
 @Serializable

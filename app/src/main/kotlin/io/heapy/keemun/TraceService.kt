@@ -1,7 +1,5 @@
 package io.heapy.keemun
 
-import java.util.ArrayDeque
-
 object TraceService {
     fun describe(graph: KeemunGraph, targetId: String, fromId: String? = null): String {
         val normalized = graph.requireValid()
@@ -52,7 +50,7 @@ object TraceService {
 
         val queue = ArrayDeque<Pair<String, List<GraphEdge>>>()
         val seen = mutableSetOf(fromId)
-        queue += fromId to emptyList()
+        queue.addLast(fromId to emptyList())
 
         while (queue.isNotEmpty()) {
             val (current, path) = queue.removeFirst()
@@ -65,7 +63,7 @@ object TraceService {
                     return nextPath
                 }
                 seen += edge.target
-                queue += edge.target to nextPath
+                queue.addLast(edge.target to nextPath)
             }
         }
 

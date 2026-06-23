@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run JVM tests
+        run: ./gradlew --no-daemon :app:jvmTest
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: test
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            link_task: :app:linkReleaseExecutableLinuxX64
+            binary: app/build/bin/linuxX64/releaseExecutable/keemun.kexe
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            link_task: :app:linkReleaseExecutableLinuxArm64
+            binary: app/build/bin/linuxArm64/releaseExecutable/keemun.kexe
+          - platform: darwin-arm64
+            runner: macos-15
+            link_task: :app:linkReleaseExecutableMacosArm64
+            binary: app/build/bin/macosArm64/releaseExecutable/keemun.kexe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build native binary
+        run: ./gradlew --no-daemon ${{ matrix.link_task }}
+
+      - name: Smoke test
+        run: |
+          chmod +x "${{ matrix.binary }}"
+          "${{ matrix.binary }}" --help
+
+      - name: Package binary
+        id: package
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${GITHUB_SHA:0:7}"
+          fi
+
+          package_name="keemun-${version}-${{ matrix.platform }}"
+          package_dir="dist/${package_name}"
+          archive="dist/${package_name}.tar.gz"
+
+          mkdir -p "${package_dir}"
+          cp "${{ matrix.binary }}" "${package_dir}/keemun"
+          chmod +x "${package_dir}/keemun"
+          tar -C "${package_dir}" -czf "${archive}" keemun
+          shasum -a 256 "${archive}" > "${archive}.sha256"
+
+          echo "archive=${archive}" >> "${GITHUB_OUTPUT}"
+          echo "checksum=${archive}.sha256" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keemun-${{ matrix.platform }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          retention-days: 1
+          if-no-files-found: error
+
+  release:
+    name: Create release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release upload "${TAG_NAME}" release-artifacts/* --clobber
+          else
+            gh release create "${TAG_NAME}" release-artifacts/* --generate-notes --verify-tag
+          fi
