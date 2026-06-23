@@ -106,7 +106,10 @@ jobs:
           cp "${{ matrix.binary }}" "${package_dir}/keemun"
           chmod +x "${package_dir}/keemun"
           tar -C "${package_dir}" -czf "${archive}" keemun
-          shasum -a 256 "${archive}" > "${archive}.sha256"
+          (
+            cd dist
+            shasum -a 256 "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256"
+          )
 
           echo "archive=${archive}" >> "${GITHUB_OUTPUT}"
           echo "checksum=${archive}.sha256" >> "${GITHUB_OUTPUT}"
