@@ -92,6 +92,24 @@ keemun validate                                    # confirm the log is well-for
 > Only **accept** after the human approves. The CLI is how you apply their verdict;
 > the decision is theirs.
 
+## Installing this skill
+
+Use the CLI to install this `keemun` skill where Codex and/or Claude Code can
+discover it. Project installs write under the current project by default; global
+installs write under the user's home directory.
+
+```bash
+keemun install skill                         # project install for Codex and Claude
+keemun install skill --agent codex           # project install for Codex only
+keemun install skill --scope global          # global install for Codex and Claude
+keemun install skill --scope global --agent claude
+```
+
+Add `--force` to overwrite an existing skill file that differs from the bundled
+version. Use `--project-dir <dir>` to install into a project other than the
+current directory, or `--home <dir>` to override the global install home in
+automation.
+
 ## Change-set payload schema
 
 `propose` takes a `ChangeProposal`: optional `change_id` (auto-assigned
@@ -118,6 +136,7 @@ Rules enforced on propose (a failing proposal is rejected, not written):
 | --- | --- |
 | `keemun init [--file f]` | Create a new log seeded with a sample graph |
 | `keemun import --from old.json [--file f]` | Import a legacy single-file JSON graph into a log |
+| `keemun install skill [--agent codex|claude|all] [--scope project|global]` | Install the bundled keemun skill for Codex and/or Claude Code |
 | `keemun render --format markdown --out f.md` | **Agent-readable** markdown of the current graph |
 | `keemun render --out f.html` | **Human-reviewable** interactive HTML |
 | `keemun serve [--file f] [--port 8080]` | Live editable graph + review API over HTTP |

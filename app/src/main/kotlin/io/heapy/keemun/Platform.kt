@@ -7,6 +7,7 @@ import okio.buffer
 import okio.use
 
 internal expect val KeemunSystemFileSystem: FileSystem
+internal expect val KeemunUserHome: String?
 
 data class KeemunPath(private val path: Path) {
     constructor(value: String) : this(value.toPath())

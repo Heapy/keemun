@@ -38,6 +38,7 @@ private class KeemunCommand(renderer: HtmlRenderer) : NoOpCliktCommand(name = "k
             DescribeCommand(),
             ValidateCommand(),
             LogCommand(),
+            InstallCommand(),
             ProposeCommand(),
             AcceptCommand(),
             RejectCommand(),
@@ -192,6 +193,42 @@ private class LogCommand : CliktCommand(name = "log") {
     }
 
     private fun plural(count: Int): String = if (count == 1) "" else "s"
+}
+
+private class InstallCommand : NoOpCliktCommand(name = "install") {
+    init {
+        subcommands(InstallSkillCommand())
+    }
+
+    override fun help(context: Context): String = "Install bundled keemun helper assets."
+}
+
+private class InstallSkillCommand : CliktCommand(name = "skill") {
+    private val agent by option("--agent")
+        .convert { SkillInstallAgent.parse(it) }
+        .default(SkillInstallAgent.ALL)
+    private val scope by option("--scope")
+        .convert { SkillInstallScope.parse(it) }
+        .default(SkillInstallScope.PROJECT)
+    private val projectDir by option("--project-dir")
+        .convert { KeemunPath(it) }
+        .default(KeemunPath("."))
+    private val home by option("--home").convert { KeemunPath(it) }
+    private val force by option("--force").flag()
+
+    override fun help(context: Context): String =
+        "Install the bundled keemun skill for Codex and/or Claude Code."
+
+    override fun run() = runCommand {
+        SkillInstaller.install(agent, scope, projectDir, home, force).forEach { result ->
+            val action = when (result.status) {
+                SkillInstallStatus.INSTALLED -> "Installed"
+                SkillInstallStatus.UPDATED -> "Updated"
+                SkillInstallStatus.UNCHANGED -> "Already up to date"
+            }
+            echo("$action ${result.agent.wireName} skill at ${result.path}")
+        }
+    }
 }
 
 private class ProposeCommand : CliktCommand(name = "propose") {

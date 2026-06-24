@@ -89,6 +89,67 @@ class CliTest {
         assertTrue(GraphRepository(graphPath.toString()).read().nodes.any { it.id == "ksp" })
     }
 
+    @Test
+    fun `install skill writes codex and claude project skills`() {
+        val projectDir = tempDir.resolve("project")
+        val cli = KeemunCli()
+
+        val installed = runCli(cli, "install", "skill", "--project-dir", projectDir.toString())
+
+        assertEquals(0, installed.code, installed.err)
+        val codexSkill = projectDir.resolve(".codex/skills/keemun/SKILL.md")
+        val claudeSkill = projectDir.resolve(".claude/skills/keemun/SKILL.md")
+        assertTrue(Files.exists(codexSkill))
+        assertTrue(Files.exists(claudeSkill))
+        assertTrue(Files.readString(codexSkill).contains("name: keemun"))
+        assertTrue(Files.readString(claudeSkill).contains("keemun install skill"))
+        assertTrue(installed.out.contains("Installed codex skill"))
+        assertTrue(installed.out.contains("Installed claude skill"))
+    }
+
+    @Test
+    fun `install skill can target global codex path and protects local edits`() {
+        val home = tempDir.resolve("home")
+        val cli = KeemunCli()
+
+        val installed = runCli(
+            cli,
+            "install", "skill",
+            "--scope", "global",
+            "--agent", "codex",
+            "--home", home.toString(),
+        )
+
+        assertEquals(0, installed.code, installed.err)
+        val codexSkill = home.resolve(".codex/skills/keemun/SKILL.md")
+        val claudeSkill = home.resolve(".claude/skills/keemun/SKILL.md")
+        assertTrue(Files.exists(codexSkill))
+        assertFalse(Files.exists(claudeSkill))
+
+        Files.writeString(codexSkill, "custom")
+        val blocked = runCli(
+            cli,
+            "install", "skill",
+            "--scope", "global",
+            "--agent", "codex",
+            "--home", home.toString(),
+        )
+        assertEquals(1, blocked.code)
+        assertTrue(blocked.err.contains("already exists and differs"))
+
+        val updated = runCli(
+            cli,
+            "install", "skill",
+            "--scope", "global",
+            "--agent", "codex",
+            "--home", home.toString(),
+            "--force",
+        )
+        assertEquals(0, updated.code, updated.err)
+        assertTrue(updated.out.contains("Updated codex skill"))
+        assertTrue(Files.readString(codexSkill).contains("keemun install skill"))
+    }
+
     private fun runCli(cli: KeemunCli, vararg args: String): CliResult {
         val result = cli.command().test(args.toList())
         return CliResult(result.statusCode, result.stdout, result.stderr)

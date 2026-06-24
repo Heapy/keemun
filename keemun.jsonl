@@ -39,3 +39,8 @@
 {"kind":"edge","change_id":"change-0003","id":"e.html-skills","source":"html-review","target":"agent-skills","type":"enables","rationale":"The skill routes the HTML view to the human for approval.","weight":0.7}
 {"kind":"edge","change_id":"change-0003","id":"e.plan-skills","source":"agent-planning","target":"agent-skills","type":"enables","rationale":"Skills encode the plan-stage workflow agents follow.","weight":0.8}
 {"kind":"change","change_id":"change-0003","status":"accepted"}
+{"kind":"change","change_id":"change-0004","status":"proposed","message":"Install agent skill command","author":"agent"}
+{"kind":"node","change_id":"change-0004","id":"install-skill-command","type":"decision","title":"Install agent skills from the CLI","summary":"Expose `keemun install skill` to place the bundled keemun usage skill into Codex or Claude Code project/global skill directories.","tags":["cli","agent","skills"]}
+{"kind":"edge","change_id":"change-0004","id":"edge.clikt-install-skill","source":"clikt-cli","target":"install-skill-command","type":"enables","rationale":"The existing scriptable Clikt command surface lets agents and humans install skills without copying files by hand.","weight":0.8}
+{"kind":"edge","change_id":"change-0004","id":"edge.agent-skills-install-command","source":"agent-skills","target":"install-skill-command","type":"enables","rationale":"Bundled agent skills need a first-class installer so the native binary can place them where Codex and Claude discover project or global skills.","weight":0.85}
+{"kind":"change","change_id":"change-0004","status":"accepted"}

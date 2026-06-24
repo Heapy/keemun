@@ -56,14 +56,24 @@ tar xzf keemun-<version>-darwin-arm64.tar.gz
 ./keemun --help
 ```
 
+**Agent skill** — install keemun's planning workflow for Codex and/or Claude
+Code:
+
+```bash
+keemun install skill                         # project: .codex + .claude
+keemun install skill --scope global          # user: ~/.codex + ~/.claude
+keemun install skill --agent codex           # only one agent
+```
+
 ## Quickstart
 
 ```bash
 keemun init                              # scaffold a sample decision graph
-keemun render --file keemun.json         # render a standalone, interactive HTML view
-keemun serve --file keemun.json          # serve an editable graph at http://127.0.0.1:8080
+keemun install skill                     # install the agent workflow into this project
+keemun render --file keemun.jsonl        # render a standalone, interactive HTML view
+keemun serve --file keemun.jsonl         # serve an editable graph at http://127.0.0.1:8080
 keemun describe <node-id>                # print a node and its rationale trace
-keemun validate --file keemun.json       # check the graph is well-formed
+keemun validate --file keemun.jsonl      # check the graph is well-formed
 ```
 
 ## License
