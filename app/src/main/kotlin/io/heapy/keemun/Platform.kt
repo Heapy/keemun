@@ -3,6 +3,8 @@ package io.heapy.keemun
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import okio.buffer
+import okio.use
 
 internal expect val KeemunSystemFileSystem: FileSystem
 
@@ -41,6 +43,12 @@ internal object KeemunFiles {
     fun writeString(path: KeemunPath, text: String) {
         fileSystem.write(path.toOkioPath()) {
             writeUtf8(text)
+        }
+    }
+
+    fun appendString(path: KeemunPath, text: String) {
+        fileSystem.appendingSink(path.toOkioPath()).buffer().use { buffer ->
+            buffer.writeUtf8(text)
         }
     }
 

@@ -12,7 +12,6 @@ import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.charsets.Charsets
 import kotlinx.serialization.Serializable
@@ -21,11 +20,10 @@ import kotlinx.serialization.encodeToString
 class KeemunServer(
     private val repository: GraphRepository,
     private val renderer: HtmlRenderer = HtmlRenderer(),
-    private val engine: RenderEngine = RenderEngine.SVG,
 ) {
     fun start(host: String, port: Int) {
         embeddedServer(CIO, host = host, port = port) {
-            keemunApplication(repository, renderer, this@KeemunServer.engine)
+            keemunApplication(repository, renderer)
         }.start(wait = true)
     }
 }
@@ -33,9 +31,8 @@ class KeemunServer(
 fun Application.keemunApplication(
     repository: GraphRepository,
     renderer: HtmlRenderer = HtmlRenderer(),
-    engine: RenderEngine = RenderEngine.SVG,
 ) {
-    val renderCache = RenderCache(repository, renderer, engine)
+    val renderCache = RenderCache(repository, renderer)
 
     routing {
         get("/") {
@@ -45,16 +42,23 @@ fun Application.keemunApplication(
             call.respondHtml(renderCache.html(editable = false))
         }
         get("/api/graph") {
-            call.respondText(
-                repository.readJson(),
-                ContentType.Application.Json.withCharset(Charsets.UTF_8),
-            )
+            call.respondJson(repository.readJson())
         }
-        put("/api/graph") {
-            call.saveGraph(repository, renderCache)
+        get("/api/log") {
+            call.respondJson(repository.readLogViewJson())
         }
-        post("/api/graph") {
-            call.saveGraph(repository, renderCache)
+        post("/api/changes") {
+            call.mutate(repository, renderCache) {
+                repository.propose(GraphJson.decodeProposal(receiveText()))
+            }
+        }
+        post("/api/changes/{id}/accept") {
+            val id = call.parameters["id"].orEmpty()
+            call.mutate(repository, renderCache) { repository.accept(id) }
+        }
+        post("/api/changes/{id}/reject") {
+            val id = call.parameters["id"].orEmpty()
+            call.mutate(repository, renderCache) { repository.reject(id) }
         }
         get("/api/describe/{id}") {
             val id = call.parameters["id"].orEmpty()
@@ -76,25 +80,20 @@ fun Application.keemunApplication(
 private class RenderCache(
     private val repository: GraphRepository,
     private val renderer: HtmlRenderer,
-    private val engine: RenderEngine,
 ) {
     private var editableHtml: RenderSnapshot? = null
     private var staticHtml: RenderSnapshot? = null
 
     fun html(editable: Boolean): String {
-        val graphSnapshot = repository.snapshot()
+        val snapshot = repository.snapshot()
         val current = if (editable) editableHtml else staticHtml
-        if (current?.cacheKey == graphSnapshot.cacheKey && current.engine == engine) {
+        if (current?.cacheKey == snapshot.cacheKey) {
             return current.html
         }
 
-        val html = renderer.render(graphSnapshot.graph, editable, engine)
-        val next = RenderSnapshot(graphSnapshot.cacheKey, engine, html)
-        if (editable) {
-            editableHtml = next
-        } else {
-            staticHtml = next
-        }
+        val html = renderer.render(snapshot.log, editable)
+        val next = RenderSnapshot(snapshot.cacheKey, html)
+        if (editable) editableHtml = next else staticHtml = next
         return html
     }
 
@@ -106,7 +105,6 @@ private class RenderCache(
 
 private data class RenderSnapshot(
     val cacheKey: GraphCacheKey,
-    val engine: RenderEngine,
     val html: String,
 )
 
@@ -114,17 +112,24 @@ private suspend fun ApplicationCall.respondHtml(html: String) {
     respondText(html, ContentType.Text.Html.withCharset(Charsets.UTF_8))
 }
 
-private suspend fun ApplicationCall.saveGraph(repository: GraphRepository, renderCache: RenderCache) {
-    runCatching {
-        repository.writeText(receiveText())
-    }.fold(
-        onSuccess = { graph ->
+private suspend fun ApplicationCall.respondJson(json: String) {
+    respondText(json, ContentType.Application.Json.withCharset(Charsets.UTF_8))
+}
+
+/** Run a repository mutation, invalidate the render cache, and return the updated log view. */
+private suspend fun ApplicationCall.mutate(
+    repository: GraphRepository,
+    renderCache: RenderCache,
+    block: suspend ApplicationCall.() -> Unit,
+) {
+    runCatching { block() }.fold(
+        onSuccess = {
             renderCache.invalidate()
-            respondText(repository.toJson(graph), ContentType.Application.Json.withCharset(Charsets.UTF_8))
+            respondJson(repository.readLogViewJson())
         },
         onFailure = { error ->
             val details = if (error is GraphValidationException) error.errors else emptyList()
-            respondError(HttpStatusCode.BadRequest, error.message ?: "Invalid graph", details)
+            respondError(HttpStatusCode.BadRequest, error.message ?: "Invalid change", details)
         },
     )
 }

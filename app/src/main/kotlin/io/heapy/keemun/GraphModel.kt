@@ -48,8 +48,8 @@ data class KeemunGraph(
 
         val nodeIdSet = nodeIds.toSet()
         nodes.forEach { node ->
-            if (!stableId.matches(node.id)) {
-                errors += "node '${node.id}' must use a stable id matching ${stableId.pattern}"
+            if (!stableIdPattern.matches(node.id)) {
+                errors += "node '${node.id}' must use a stable id matching ${stableIdPattern.pattern}"
             }
             if (node.title.isBlank()) {
                 errors += "node '${node.id}' must have a title"
@@ -57,8 +57,8 @@ data class KeemunGraph(
         }
 
         edges.forEach { edge ->
-            if (!stableId.matches(edge.id)) {
-                errors += "edge '${edge.id}' must use a stable id matching ${stableId.pattern}"
+            if (!stableIdPattern.matches(edge.id)) {
+                errors += "edge '${edge.id}' must use a stable id matching ${stableIdPattern.pattern}"
             }
             if (edge.source !in nodeIdSet) {
                 errors += "edge '${edge.id}' references missing source '${edge.source}'"
@@ -75,7 +75,7 @@ data class KeemunGraph(
             if (edge.order != null && edge.order <= 0) {
                 errors += "edge '${edge.id}' order must be positive"
             }
-            if (edge.decidedAt != null && !isoDate.matches(edge.decidedAt)) {
+            if (edge.decidedAt != null && !isoDatePattern.matches(edge.decidedAt)) {
                 errors += "edge '${edge.id}' decided_at must use YYYY-MM-DD"
             }
         }
@@ -90,12 +90,10 @@ data class KeemunGraph(
             .keys
             .sorted()
             .map { "duplicate $kind id '$it'" }
-
-    companion object {
-        private val stableId = Regex("^[a-z0-9][a-z0-9._:-]*$")
-        private val isoDate = Regex("^\\d{4}-\\d{2}-\\d{2}$")
-    }
 }
+
+internal val stableIdPattern = Regex("^[a-z0-9][a-z0-9._:-]*$")
+internal val isoDatePattern = Regex("^\\d{4}-\\d{2}-\\d{2}$")
 
 @Serializable
 data class GraphMetadata(
