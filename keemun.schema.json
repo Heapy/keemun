@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://heapy.io/keemun/keemun.schema.json",
+  "title": "Keemun JSONL record",
+  "description": "One line of a Keemun graph log. The on-disk file is newline-delimited JSON (JSONL): every line is one of these records. Records sharing a change_id form one reviewable change-set; the current graph is the projection of all accepted change-sets.",
+  "oneOf": [
+    { "$ref": "#/$defs/headerRecord" },
+    { "$ref": "#/$defs/changeRecord" },
+    { "$ref": "#/$defs/metaRecord" },
+    { "$ref": "#/$defs/nodeRecord" },
+    { "$ref": "#/$defs/edgeRecord" },
+    { "$ref": "#/$defs/deleteRecord" }
+  ],
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "description": "Lowercase, stable identifier (also used for change_id)."
+    },
+    "isoDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Calendar date as YYYY-MM-DD."
+    },
+    "changeStatus": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "rejected"],
+      "description": "Review status of a change-set."
+    },
+    "nodeType": {
+      "type": "string",
+      "enum": ["constraint", "decision", "question", "option", "outcome"]
+    },
+    "nodeStatus": {
+      "type": "string",
+      "enum": ["accepted", "proposed", "rejected", "deprecated"],
+      "description": "Decision status of the node itself (distinct from a change-set's review status)."
+    },
+    "edgeType": {
+      "type": "string",
+      "enum": ["constrains", "enables", "forbids", "conflicts"]
+    },
+    "edgeStatus": {
+      "type": "string",
+      "enum": ["accepted", "considered", "rejected"]
+    },
+    "edgePolarity": {
+      "type": "string",
+      "enum": ["positive", "negative"]
+    },
+    "headerRecord": {
+      "type": "object",
+      "description": "First line of the file; declares the format version and the project repository.",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "header" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "repo": { "type": "string", "format": "uri", "description": "Link to the keemun project repository." }
+      }
+    },
+    "changeRecord": {
+      "type": "object",
+      "description": "Declares or transitions a change-set. Fields merge across records with the same change_id (status: last wins; message/author/created_at: last non-null wins).",
+      "additionalProperties": false,
+      "required": ["kind", "change_id"],
+      "properties": {
+        "kind": { "const": "change" },
+        "change_id": { "$ref": "#/$defs/stableId" },
+        "status": { "$ref": "#/$defs/changeStatus" },
+        "message": { "type": "string" },
+        "author": { "type": "string" },
+        "created_at": { "type": "string" }
+      }
+    },
+    "metaRecord": {
+      "type": "object",
+      "description": "Versioned graph metadata. Full-state replace; last accepted wins.",
+      "additionalProperties": false,
+      "required": ["kind", "change_id"],
+      "properties": {
+        "kind": { "const": "meta" },
+        "change_id": { "$ref": "#/$defs/stableId" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "authors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "nodeRecord": {
+      "type": "object",
+      "description": "A full node revision. A new row is a new full version (replace, not field-merge).",
+      "additionalProperties": false,
+      "required": ["kind", "change_id", "id", "type", "title"],
+      "properties": {
+        "kind": { "const": "node" },
+        "change_id": { "$ref": "#/$defs/stableId" },
+        "id": { "$ref": "#/$defs/stableId" },
+        "type": { "$ref": "#/$defs/nodeType" },
+        "title": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "status": { "$ref": "#/$defs/nodeStatus" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "external": { "type": "boolean" }
+      }
+    },
+    "edgeRecord": {
+      "type": "object",
+      "description": "A full edge revision. Edges are first-class rationale records.",
+      "additionalProperties": false,
+      "required": ["kind", "change_id", "id", "source", "target", "type", "rationale"],
+      "properties": {
+        "kind": { "const": "edge" },
+        "change_id": { "$ref": "#/$defs/stableId" },
+        "id": { "$ref": "#/$defs/stableId" },
+        "source": { "$ref": "#/$defs/stableId" },
+        "target": { "$ref": "#/$defs/stableId" },
+        "type": { "$ref": "#/$defs/edgeType" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/edgeStatus" },
+        "polarity": { "$ref": "#/$defs/edgePolarity" },
+        "weight": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "order": { "type": "integer", "minimum": 1 },
+        "decided_at": { "$ref": "#/$defs/isoDate" },
+        "criteria": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "deleteRecord": {
+      "type": "object",
+      "description": "Tombstone for a node or edge id.",
+      "additionalProperties": false,
+      "required": ["kind", "change_id", "entity", "id"],
+      "properties": {
+        "kind": { "const": "delete" },
+        "change_id": { "$ref": "#/$defs/stableId" },
+        "entity": { "type": "string", "enum": ["node", "edge"] },
+        "id": { "$ref": "#/$defs/stableId" }
+      }
+    }
+  }
+}
